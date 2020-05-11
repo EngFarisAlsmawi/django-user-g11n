@@ -9,11 +9,16 @@ class UserLanguageMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        user_language = getattr(
-            request.user,
-            'language',
-            settings.LANGUAGE_CODE
-        )
+        user_language = settings.LANGUAGE_CODE
+        if request.user.is_authenticated:
+            user_language = getattr(request.user, 'language', user_language)
+            if getattr(settings, "USER_G11N_ATTR_NAME", None):
+                user_profile = getattr(
+                    request.user,
+                    settings.USER_G11N_ATTR_NAME, None)
+                if user_profile:
+                    user_language = getattr(user_profile, "language", user_language)
+
         translation.activate(user_language)
 
         if django.VERSION[0] <= 2:
@@ -32,9 +37,18 @@ class UserTimeZoneMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated:
-            timezone.activate(pytz.timezone(request.user.timezone))
-        else:
+        if request.user.is_anonymous:
             timezone.deactivate()
+        user_timezone = getattr(settings,'TIME_ZONE',None)
+        if request.user.is_authenticated:
+            user_timezone = getattr(request.user, 'timezone', user_timezone)
+            if getattr(settings, "USER_G11N_ATTR_NAME", None):
+                user_profile = getattr(
+                    request.user,
+                    settings.USER_G11N_ATTR_NAME, None)
+                if user_profile:
+                    user_timezone = getattr(user_profile, "timezone", user_timezone)
+        if user_timezone:
+            timezone.activate(pytz.timezone(user_timezone))
 
         return self.get_response(request)
